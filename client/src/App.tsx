@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from './context/AuthContext.js';
-import { Navbar, ActiveTab } from './components/Navbar.js';
-import { AuthModal } from './features/auth/AuthModal.js';
-import { TripList } from './features/groups/TripList.js';
-import { CreateTripModal } from './features/groups/CreateTripModal.js';
-import { TripOverviewTab } from './features/overview/TripOverviewTab.js';
-import { ExpenseList } from './features/expenses/ExpenseList.js';
-import { AddExpenseModal } from './features/expenses/AddExpenseModal.js';
-import { BalancesTab } from './features/balances/BalancesTab.js';
-import { MembersTab } from './features/members/MembersTab.js';
-import { ActivityTab } from './features/activity/ActivityTab.js';
-import { api } from './lib/api.js';
+import React, { useState, useEffect, useRef } from "react";
+import { useAuth } from "./context/AuthContext.js";
+import { Navbar, ActiveTab } from "./components/Navbar.js";
+import { WelcomePage } from "./features/groups/WelcomePage.js";
+import { useLanguage } from "./context/LanguageContext.js";
+import { TripList } from "./features/groups/TripList.js";
+import { CreateTripModal } from "./features/groups/CreateTripModal.js";
+import { TripOverviewTab } from "./features/overview/TripOverviewTab.js";
+import { ExpenseList } from "./features/expenses/ExpenseList.js";
+import { AddExpenseModal } from "./features/expenses/AddExpenseModal.js";
+import { BalancesTab } from "./features/balances/BalancesTab.js";
+import { MembersTab } from "./features/members/MembersTab.js";
+import { ActivityTab } from "./features/activity/ActivityTab.js";
+import { api } from "./lib/api.js";
 
 export function App() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useLanguage();
+  const [tripsError, setTripsError] = useState(false);
+  const [tripError, setTripError] = useState(false);
+  const tripRequest = useRef(0);
+  const listRequest = useRef(0);
 
   // Trips state
   const [trips, setTrips] = useState<any[]>([]);
@@ -23,7 +29,7 @@ export function App() {
 
   // Active Trip Data
   const [currentTrip, setCurrentTrip] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [expenses, setExpenses] = useState<any[]>([]);
   const [balancesData, setBalancesData] = useState<any | null>(null);
   const [settlements, setSettlements] = useState<any[]>([]);
@@ -33,44 +39,58 @@ export function App() {
 
   // Modals & Navigation filters
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
-  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>('ALL');
+  const [expenseCategoryFilter, setExpenseCategoryFilter] =
+    useState<string>("ALL");
 
   // Load Trips
   const loadTrips = async () => {
     if (!user) return;
+    const request = ++listRequest.current;
+    setTripsError(false);
     setLoadingTrips(true);
     try {
       const data = await api.groups.list();
-      setTrips(data.groups);
+      if (request === listRequest.current) setTrips(data.groups);
     } catch (err) {
-      console.error('Failed to load trips:', err);
+      console.error("Failed to load trips:", err);
+      if (request === listRequest.current) setTripsError(true);
     } finally {
-      setLoadingTrips(false);
+      if (request === listRequest.current) setLoadingTrips(false);
     }
   };
 
   useEffect(() => {
+    setTrips([]);
+    setActiveTripId(null);
+    setCurrentTrip(null);
+    setCreateTripOpen(false);
+    setAddExpenseOpen(false);
     if (user) {
       loadTrips();
     }
+    return () => {
+      listRequest.current++;
+      tripRequest.current++;
+    };
   }, [user]);
 
   // Handle invitation claim route if URL is /join/:token
   useEffect(() => {
     const path = window.location.pathname;
-    if (user && path.startsWith('/join/')) {
-      const token = path.replace('/join/', '').trim();
+    if (user && path.startsWith("/join/")) {
+      const token = path.replace("/join/", "").trim();
       if (token) {
-        api.members.claimInvite(token)
-          .then(res => {
-            window.history.pushState({}, '', '/');
+        api.members
+          .claimInvite(token)
+          .then((res) => {
+            window.history.pushState({}, "", "/");
             loadTrips();
             setActiveTripId(res.groupId);
           })
-          .catch(err => {
-            console.error('Invite claim error:', err);
-            alert(err.message || 'Failed to claim invitation.');
-            window.history.pushState({}, '', '/');
+          .catch((err) => {
+            console.error("Invite claim error:", err);
+            alert(err.message || "Failed to claim invitation.");
+            window.history.pushState({}, "", "/");
           });
       }
     }
@@ -78,17 +98,21 @@ export function App() {
 
   // Load Active Trip Complete Data
   const loadTripData = async (groupId: string) => {
+    const request = ++tripRequest.current;
+    setTripError(false);
     setLoadingTripData(true);
     try {
-      const [groupRes, expRes, balRes, setRes, analRes, actRes] = await Promise.all([
-        api.groups.get(groupId),
-        api.expenses.list(groupId),
-        api.balances.get(groupId),
-        api.settlements.list(groupId),
-        api.analytics.get(groupId),
-        api.activity.list(groupId)
-      ]);
+      const [groupRes, expRes, balRes, setRes, analRes, actRes] =
+        await Promise.all([
+          api.groups.get(groupId),
+          api.expenses.list(groupId),
+          api.balances.get(groupId),
+          api.settlements.list(groupId),
+          api.analytics.get(groupId),
+          api.activity.list(groupId),
+        ]);
 
+      if (request !== tripRequest.current) return;
       setCurrentTrip(groupRes.group);
       setExpenses(expRes.expenses);
       setBalancesData(balRes);
@@ -96,41 +120,69 @@ export function App() {
       setAnalyticsData(analRes);
       setActivityData(actRes.activity);
     } catch (err) {
-      console.error('Failed to load trip details:', err);
+      console.error("Failed to load trip details:", err);
+      if (request === tripRequest.current) setTripError(true);
     } finally {
-      setLoadingTripData(false);
+      if (request === tripRequest.current) setLoadingTripData(false);
     }
   };
 
   useEffect(() => {
+    setExpenseCategoryFilter("ALL");
+    setCurrentTrip(null);
     if (activeTripId) {
       loadTripData(activeTripId);
     } else {
       setCurrentTrip(null);
     }
+    return () => {
+      tripRequest.current++;
+    };
   }, [activeTripId]);
 
   if (authLoading) {
     return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
-        <p className="text-muted font-medium">Loading TripSplit...</p>
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p className="text-muted font-medium" role="status">
+          {t("loading")}
+        </p>
       </div>
     );
   }
 
-  // Not logged in -> Show Auth Modal
+  // Let visitors explore the product before opening authentication.
   if (!user) {
-    return <AuthModal isOpen={true} />;
+    return <WelcomePage />;
   }
 
   // Current user's balance metrics for the active trip
   const currentMemberId = currentTrip?.currentMember?.memberId;
-  const myBalance = balancesData?.memberBalances?.find((m: any) => m.memberId === currentMemberId);
+  const myBalance = balancesData?.memberBalances?.find(
+    (m: any) => m.memberId === currentMemberId,
+  );
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+    >
       <Navbar
-        currentTrip={currentTrip ? { id: currentTrip.id, name: currentTrip.name, baseCurrency: currentTrip.baseCurrency, role: currentTrip.currentMember?.role || 'member' } : null}
+        currentTrip={
+          currentTrip
+            ? {
+                id: currentTrip.id,
+                name: currentTrip.name,
+                baseCurrency: currentTrip.baseCurrency,
+                role: currentTrip.currentMember?.role || "member",
+              }
+            : null
+        }
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onBackToTrips={() => {
@@ -140,46 +192,93 @@ export function App() {
         onAddExpenseClick={() => setAddExpenseOpen(true)}
       />
 
-      <main className="main-content">
+      <main id="main" className="main-content">
         {!activeTripId ? (
           /* Trips Dashboard */
           <TripList
             trips={trips}
-            onSelectTrip={id => {
+            onSelectTrip={(id) => {
               setActiveTripId(id);
-              setActiveTab('overview');
+              setActiveTab("overview");
             }}
             onCreateTripClick={() => setCreateTripOpen(true)}
             loading={loadingTrips}
+            error={tripsError}
+            onRetry={loadTrips}
           />
         ) : loadingTripData ? (
           /* Trip Loading State */
-          <div className="content-inner" style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-            <p className="text-muted font-medium">Loading trip accounting ledger...</p>
+          <div
+            className="content-inner"
+            style={{ textAlign: "center", padding: "4rem 1rem" }}
+          >
+            <p className="text-muted font-medium" role="status">
+              {t("loading")}
+            </p>
+          </div>
+        ) : tripError ? (
+          <div className="content-inner">
+            <div className="card" role="alert">
+              <p>{t("detailError")}</p>
+              <button
+                className="btn btn-primary"
+                onClick={() => loadTripData(activeTripId)}
+              >
+                {t("retry")}
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setActiveTripId(null)}
+              >
+                {t("trips")}
+              </button>
+            </div>
           </div>
         ) : currentTrip ? (
           /* Active Trip Tabs */
           <div className="content-inner">
-            {activeTab === 'overview' && (
+            {activeTab === "overview" && expenses.length === 0 && (
+              <section className="setup-guide card">
+                <div>
+                  <p className="eyebrow">{t("setup")}</p>
+                  <p className="text-muted">{t("setupBody")}</p>
+                </div>
+                <div className="hero-actions">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setActiveTab("members")}
+                  >
+                    {t("addFriends")}
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setAddExpenseOpen(true)}
+                  >
+                    {t("addExpense")}
+                  </button>
+                </div>
+              </section>
+            )}
+            {activeTab === "overview" && (
               <TripOverviewTab
                 groupId={currentTrip.id}
                 tripName={currentTrip.name}
                 baseCurrency={currentTrip.baseCurrency}
-                totalSpendDecimal={balancesData?.totalSpendDecimal || '0.00'}
-                myPaidDecimal={myBalance?.totalPaidDecimal || '0.00'}
-                myShareDecimal={myBalance?.totalShareDecimal || '0.00'}
-                myNetBalanceDecimal={myBalance?.netBalanceDecimal || '0.00'}
-                myStatus={myBalance?.status || 'settled'}
+                totalSpendDecimal={balancesData?.totalSpendDecimal || "0.00"}
+                myPaidDecimal={myBalance?.totalPaidDecimal || "0.00"}
+                myShareDecimal={myBalance?.totalShareDecimal || "0.00"}
+                myNetBalanceDecimal={myBalance?.netBalanceDecimal || "0.00"}
+                myStatus={myBalance?.status || "settled"}
                 friendSpending={analyticsData?.spendingByFriend || []}
                 categorySpending={analyticsData?.spendingByCategory || []}
                 recentExpenses={expenses}
                 onAddExpenseClick={() => setAddExpenseOpen(true)}
-                onViewExpensesTab={() => setActiveTab('expenses')}
-                onCategorySelected={cat => setExpenseCategoryFilter(cat)}
+                onViewExpensesTab={() => setActiveTab("expenses")}
+                onCategorySelected={(cat) => setExpenseCategoryFilter(cat)}
               />
             )}
 
-            {activeTab === 'expenses' && (
+            {activeTab === "expenses" && (
               <ExpenseList
                 groupId={currentTrip.id}
                 baseCurrency={currentTrip.baseCurrency}
@@ -192,7 +291,7 @@ export function App() {
               />
             )}
 
-            {activeTab === 'balances' && (
+            {activeTab === "balances" && (
               <BalancesTab
                 groupId={currentTrip.id}
                 baseCurrency={currentTrip.baseCurrency}
@@ -205,7 +304,7 @@ export function App() {
               />
             )}
 
-            {activeTab === 'members' && (
+            {activeTab === "members" && (
               <MembersTab
                 groupId={currentTrip.id}
                 members={currentTrip.members}
@@ -214,7 +313,7 @@ export function App() {
               />
             )}
 
-            {activeTab === 'activity' && (
+            {activeTab === "activity" && (
               <ActivityTab activities={activityData} />
             )}
           </div>
@@ -226,7 +325,7 @@ export function App() {
         <CreateTripModal
           isOpen={createTripOpen}
           onClose={() => setCreateTripOpen(false)}
-          onTripCreated={newTrip => {
+          onTripCreated={(newTrip) => {
             loadTrips();
             setActiveTripId(newTrip.id);
           }}

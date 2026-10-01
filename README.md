@@ -4,6 +4,18 @@
 
 ---
 
+## Friendly trip planning experience
+
+- A public welcome page explains the product before sign-in, with a working equal-split calculator, travel guidance, and FAQs.
+- The trips dashboard includes search, keyboard-accessible trip cards, loading placeholders, retry states, and first-trip guidance. Empty trip overviews link directly to adding friends and expenses.
+- English, Hindi, and Gujarati are available from the header. The preference persists on this browser, updates the document language, and covers home, authentication, trip creation, navigation, onboarding, and the calculator. Detailed expense, member, balance, analytics, and activity tools and server error messages remain in English; this is not full-app localization.
+- Mobile navigation includes all five trip sections. Dialogs support focus trapping, Escape, and focus restoration. Browser zoom and reduced-motion preferences are supported.
+- The calculator does not save expenses. It uses integer minor units, respects currency precision, and explains how any remainder is distributed.
+
+Frontend verification: `npm --prefix client test` and `npm --prefix client run build`. Calculator tests cover rounding, zero- and three-decimal currencies, invalid inputs, and preservation of totals across group sizes from 1 to 100.
+
+---
+
 ## 🌟 Key Features & Vertical Slice Delivered
 
 - **Deterministic Accounting Engine**: Integer minor units arithmetic with zero floating-point drift. Preserves exact sum totals on equal, exact, percentage, and weighted splits (e.g., 100 split 3 ways yields 33.34, 33.33, 33.33).

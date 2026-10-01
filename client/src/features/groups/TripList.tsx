@@ -1,6 +1,20 @@
-import React from 'react';
-import { useAuth } from '../../context/AuthContext.js';
-import { Plus, Calendar, Users, Receipt, ArrowRight } from 'lucide-react';
+import React, { useState } from "react";
+import { useAuth } from "../../context/AuthContext.js";
+import { useLanguage } from "../../context/LanguageContext.js";
+import {
+  Plus,
+  Calendar,
+  Users,
+  Receipt,
+  ArrowUpRight,
+  Search,
+  Compass,
+} from "lucide-react";
+import {
+  QuickSplit,
+  GettingStarted,
+  TravelTips,
+} from "../../components/TravelTools.js";
 
 interface TripItem {
   id: string;
@@ -11,187 +25,176 @@ interface TripItem {
   endDate?: string;
   status: string;
   role: string;
-  memberId?: string;
   memberCount: number;
   expenseCount: number;
 }
-
 interface TripListProps {
   trips: TripItem[];
   onSelectTrip: (tripId: string) => void;
   onCreateTripClick: () => void;
   loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
 }
 
 export const TripList: React.FC<TripListProps> = ({
   trips,
   onSelectTrip,
   onCreateTripClick,
-  loading
+  loading,
+  error,
+  onRetry,
 }) => {
   const { user } = useAuth();
-
+  const { t, language } = useLanguage();
+  const [query, setQuery] = useState("");
+  const filtered = trips.filter((trip) =>
+    `${trip.name} ${trip.description || ""}`
+      .toLocaleLowerCase()
+      .includes(query.trim().toLocaleLowerCase()),
+  );
+  const date = (value: string) => {
+    const parsed = new Date(value.slice(0, 10) + "T12:00:00");
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : parsed.toLocaleDateString(language, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+  };
   return (
-    <div className="content-inner" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Welcome Banner */}
-      <div
-        className="card"
-        style={{
-          background: 'linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)',
-          color: '#FFFFFF',
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)',
-          border: 'none'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: '#FFFFFF' }}>
-              Welcome back, {user?.name.split(' ')[0]}!
-            </h1>
-            <p style={{ opacity: 0.88, fontSize: '0.95rem', marginTop: '0.25rem' }}>
-              Track expenses, understand your shares, and settle group balances smoothly.
-            </p>
-          </div>
-
-          <button
-            id="btn-create-trip"
-            type="button"
-            className="btn btn-emerald"
-            onClick={onCreateTripClick}
-            style={{ fontWeight: 700, padding: '0.75rem 1.25rem' }}
-          >
-            <Plus size={18} />
-            <span>Create New Trip</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Trip List Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="content-inner dashboard">
+      <section className="dashboard-welcome">
         <div>
-          <h2 className="text-xl font-bold">Your Trips</h2>
-          <p className="text-sm text-muted">Select an active trip to record expenses or review balances</p>
+          <p className="eyebrow">{t("home")}</p>
+          <h1>{t("welcome", { name: user?.name.split(" ")[0] || "" })}</h1>
+          <p className="text-muted">{t("dashboardIntro")}</p>
         </div>
-      </div>
-
-      {/* Loading State */}
-      {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} className="card" style={{ height: 160, opacity: 0.6, animation: 'pulse 1.5s infinite' }} />
-          ))}
-        </div>
-      ) : trips.length === 0 ? (
-        /* Empty State */
-        <div
-          className="card"
-          style={{
-            padding: '3.5rem 1.5rem',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
+        <button
+          id="btn-create-trip"
+          className="btn btn-primary"
+          onClick={onCreateTripClick}
         >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              backgroundColor: 'var(--accent-primary-light)',
-              color: 'var(--accent-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Plus size={28} />
+          <Plus size={18} />
+          {t("newTrip")}
+        </button>
+      </section>
+      <div className="dashboard-layout">
+        <section className="trip-section">
+          <div className="section-heading trip-heading">
+            <h2>
+              {t("trips")} <span className="count-badge">{trips.length}</span>
+            </h2>
+            <label className="search-field">
+              <Search size={18} />
+              <input
+                aria-label={t("search")}
+                placeholder={t("search")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
           </div>
-          <div>
-            <h3 className="text-lg font-bold">No trips yet</h3>
-            <p className="text-sm text-muted" style={{ maxWidth: '400px', marginTop: '0.25rem' }}>
-              Add your first trip to start splitting bills, tracking personal shares, and settling balances with friends.
-            </p>
-          </div>
-          <button id="btn-create-first-trip" type="button" className="btn btn-primary" onClick={onCreateTripClick}>
-            <Plus size={16} />
-            <span>Create Your First Trip</span>
-          </button>
-        </div>
-      ) : (
-        /* Trips Grid */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-          {trips.map(trip => (
-            <div
-              key={trip.id}
-              className="card card-hover"
-              onClick={() => onSelectTrip(trip.id)}
-              style={{
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '1rem'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
-                    {trip.name}
-                  </h3>
-                  <span className="badge badge-indigo text-xs font-bold">{trip.baseCurrency}</span>
-                </div>
-
-                {trip.description && (
-                  <p className="text-sm text-muted" style={{ marginTop: '0.35rem', lineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {trip.description}
-                  </p>
-                )}
+          {loading ? (
+            <div className="trip-grid" role="status" aria-label={t("loading")}>
+              {[1, 2].map((i) => (
+                <div key={i} className="card skeleton" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="card empty-trip" role="alert">
+              <p>{t("loadError")}</p>
+              <button className="btn btn-secondary" onClick={onRetry}>
+                {t("retry")}
+              </button>
+            </div>
+          ) : !trips.length ? (
+            <div className="empty-trip">
+              <div className="empty-art" aria-hidden="true">
+                <Compass size={44} />
+                <span>✦</span>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {trip.startDate && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    <Calendar size={14} />
-                    <span>{trip.startDate} {trip.endDate ? `→ ${trip.endDate}` : ''}</span>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingTop: '0.75rem',
-                    borderTop: '1px solid var(--border-subtle)',
-                    fontSize: '0.84rem'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'var(--text-secondary)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Users size={15} />
-                      <strong>{trip.memberCount}</strong> {trip.memberCount === 1 ? 'member' : 'members'}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Receipt size={15} />
-                      <strong>{trip.expenseCount}</strong> {trip.expenseCount === 1 ? 'expense' : 'expenses'}
-                    </span>
-                  </div>
-
-                  <span style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
-                    Open <ArrowRight size={14} />
-                  </span>
-                </div>
+              <h3>{t("empty")}</h3>
+              <p className="text-muted">{t("emptyBody")}</p>
+              <button
+                id="btn-create-first-trip"
+                className="btn btn-primary"
+                onClick={onCreateTripClick}
+              >
+                <Plus size={17} />
+                {t("start")}
+              </button>
+              <div className="empty-steps">
+                <span>01 · {t("trips")}</span>
+                <span>02 · {t("members")}</span>
+                <span>03 · {t("expenses")}</span>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ) : !filtered.length ? (
+            <div className="card empty-trip">
+              <Search size={28} />
+              <h3>{t("noResults")}</h3>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setQuery("")}
+              >
+                {t("clear")}
+              </button>
+            </div>
+          ) : (
+            <div className="trip-grid">
+              {filtered.map((trip, index) => (
+                <button
+                  type="button"
+                  key={trip.id}
+                  className={`trip-card`}
+                  onClick={() => onSelectTrip(trip.id)}
+                >
+                  <div className={`trip-cover cover-${index % 3}`}>
+                    <Compass size={36} />
+                    <span className="badge badge-neutral">
+                      {trip.baseCurrency}
+                    </span>
+                  </div>
+                  <div className="trip-card-body">
+                    <h3>
+                      {trip.name}
+                      <ArrowUpRight size={19} />
+                    </h3>
+                    {trip.description && (
+                      <p className="text-muted trip-description">
+                        {trip.description}
+                      </p>
+                    )}
+                    {trip.startDate && (
+                      <p className="trip-date">
+                        <Calendar size={14} />
+                        {date(trip.startDate)}
+                        {trip.endDate ? ` – ${date(trip.endDate)}` : ""}
+                      </p>
+                    )}
+                    <div className="trip-meta">
+                      <span>
+                        <Users size={15} />
+                        {trip.memberCount} {t("members")}
+                      </span>
+                      <span>
+                        <Receipt size={15} />
+                        {trip.expenseCount} {t("expenses")}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+        <TravelTips />
+      </div>
+      <GettingStarted />
+      <QuickSplit />
+      {language !== "en" && <p className="form-hint">{t("languageNote")}</p>}
     </div>
   );
 };
